@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright'
 
 const port = Number(process.env.QA_PORT ?? 4173)
-const baseUrl = `http://127.0.0.1:${port}`
+const externalBaseUrl = process.env.QA_BASE_URL?.replace(/\/$/, '')
+const baseUrl = externalBaseUrl ?? `http://127.0.0.1:${port}`
 const projectRoot = fileURLToPath(new URL('..', import.meta.url))
 const screenshotDir = new URL('../docs/screenshots/', import.meta.url)
 mkdirSync(screenshotDir, { recursive: true })
@@ -36,6 +37,11 @@ const serverIsReady = async () => {
 }
 
 const startServer = async () => {
+  if (externalBaseUrl) {
+    console.log(`Using external QA target at ${baseUrl}`)
+    return
+  }
+
   if (await serverIsReady()) {
     console.log(`Reusing preview at ${baseUrl}`)
     return
@@ -96,7 +102,7 @@ const run = async () => {
   await assertText(desktop, /CLICK TO REVEAL|Het stilte-uur in de leeszaal/i, 'desktop catalog')
   console.log('Desktop start captured')
 
-  const manifest = await fetch(`${baseUrl}/manifest.webmanifest`)
+  const manifest = await fetch(`${baseUrl}/manifest.json`)
   if (!manifest.ok) {
     throw new Error(`Manifest request failed with ${manifest.status}`)
   }

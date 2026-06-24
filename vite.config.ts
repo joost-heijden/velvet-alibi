@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      manifestFilename: 'manifest.json',
       includeAssets: ['assets/app-icon.png', 'assets/share-card.webp'],
       manifest: {
         name: 'Velvet Alibi',
@@ -37,7 +38,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,webp,svg,ico,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,json,png,webp,svg,ico}'],
         globIgnores: ['**/mascot-concepts/**'],
       },
     }),
