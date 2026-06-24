@@ -12,6 +12,7 @@ npm run typecheck
 npm test
 npm run build
 npm run qa:e2e
+QA_BASE_URL=https://velvet-alibi.onrender.com npm run qa:e2e
 ```
 
 Results:
@@ -19,8 +20,9 @@ Results:
 - Lint: passed with `oxlint`.
 - Typecheck: passed with `tsc -b --pretty false`.
 - Unit/component tests: 4 files, 9 tests passed.
-- Production build: passed; PWA service worker generated; precache 16 entries, 706 KB.
+- Production build: passed; PWA service worker generated; `manifest.json` emitted and precached.
 - Playwright QA: passed against production preview.
+- Live Playwright QA: passed against Render at `https://velvet-alibi.onrender.com`.
 
 ## Playwright Coverage
 
@@ -41,7 +43,7 @@ Flow coverage:
 - Made the correct accusation
 - Generated share result copy
 - Verified desktop layout and finale panel
-- Fetched `manifest.webmanifest`
+- Fetched `manifest.json`
 
 Screenshots:
 
@@ -61,13 +63,29 @@ Screenshots:
 
 ## Local Preview
 
-The production preview is running at:
+The production preview defaults to:
 
 ```text
 http://127.0.0.1:4173
 ```
 
 Note: `npm run qa:e2e` may emit a Node warning about Windows shell argument handling while starting `npm run preview`; the QA run exits successfully.
+
+## Live Render QA
+
+Live URL:
+
+```text
+https://velvet-alibi.onrender.com
+```
+
+Checks completed:
+
+- Root route returns `200` and loads the app.
+- `manifest.json` returns `200`.
+- Mobile flow passed: reveal case card, open first case, grid interaction, wrong check, hint, wrong accusation, QA-fill solution, correct accusation and share result.
+- Desktop catalog smoke check passed.
+- Render dashboard shows the static site `velvet-alibi` as `Deployed`.
 
 ## GitHub And Render Status
 
@@ -79,7 +97,9 @@ https://github.com/joost-heijden/velvet-alibi
 
 Render:
 
+- Live URL: `https://velvet-alibi.onrender.com`
+- Blueprint ID: `exs-d8u3ldraml3c73d4fc00`
+- Static site service ID: `srv-d8u3lojtqb8s73aq9550`
 - `render.yaml` is present and configured for a static site.
-- Deploy link: `https://render.com/deploy?repo=https://github.com/joost-heijden/velvet-alibi`
-- Local Render creation was blocked because this machine has no `render` CLI and no `RENDER_API_KEY`.
-- Manual settings: Static Site, build command `npm ci && npm run build`, publish directory `dist`.
+- Build command: `npm ci && npm run build`
+- Publish directory: `dist`

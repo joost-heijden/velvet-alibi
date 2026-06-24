@@ -42,6 +42,12 @@ npm run build      # production PWA build
 npm run qa:e2e     # Playwright mobile/desktop smoke QA against preview
 ```
 
+Run the same Playwright smoke flow against the deployed app:
+
+```bash
+QA_BASE_URL=https://velvet-alibi.onrender.com npm run qa:e2e
+```
+
 ## Case Content
 
 Add a case in `src/data/cases.ts` with:
@@ -65,6 +71,12 @@ https://github.com/joost-heijden/velvet-alibi
 
 Render Blueprint is included in `render.yaml`.
 
+Live Render URL:
+
+```text
+https://velvet-alibi.onrender.com
+```
+
 Blueprint deploy link:
 
 ```text
@@ -77,9 +89,7 @@ Static site settings:
 - Publish directory: `dist`
 - Rewrite: `/*` to `/index.html`
 
-If creating manually in Render, choose **Static Site**, connect the GitHub repo, use the build command above, and set the publish directory to `dist`.
-
-Current note: this workspace did not have a Render CLI or `RENDER_API_KEY`, so the live Render service could not be created from the terminal. The repo is pushed and deploy-ready.
+The current Render service was created from the Blueprint as a managed Static Site and validated with the live Playwright smoke flow.
 
 ## Project Docs
 
