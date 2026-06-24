@@ -65,3 +65,18 @@ http://127.0.0.1:4173
 ```
 
 Note: `npm run qa:e2e` may emit a Node warning about Windows shell argument handling while starting `npm run preview`; the QA run exits successfully.
+
+## GitHub And Render Status
+
+GitHub:
+
+```text
+https://github.com/joost-heijden/velvet-alibi
+```
+
+Render:
+
+- `render.yaml` is present and configured for a static site.
+- Deploy link: `https://render.com/deploy?repo=https://github.com/joost-heijden/velvet-alibi`
+- Local Render creation was blocked because this machine has no `render` CLI and no `RENDER_API_KEY`.
+- Manual settings: Static Site, build command `npm ci && npm run build`, publish directory `dist`.

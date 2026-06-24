@@ -57,7 +57,19 @@ Run `npm test` after adding or changing cases. The case tests call `validateCase
 
 ## Deployment
 
+GitHub repository:
+
+```text
+https://github.com/joost-heijden/velvet-alibi
+```
+
 Render Blueprint is included in `render.yaml`.
+
+Blueprint deploy link:
+
+```text
+https://render.com/deploy?repo=https://github.com/joost-heijden/velvet-alibi
+```
 
 Static site settings:
 
@@ -66,6 +78,8 @@ Static site settings:
 - Rewrite: `/*` to `/index.html`
 
 If creating manually in Render, choose **Static Site**, connect the GitHub repo, use the build command above, and set the publish directory to `dist`.
+
+Current note: this workspace did not have a Render CLI or `RENDER_API_KEY`, so the live Render service could not be created from the terminal. The repo is pushed and deploy-ready.
 
 ## Project Docs
 
