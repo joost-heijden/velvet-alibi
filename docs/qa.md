@@ -31,8 +31,9 @@ Viewport coverage:
 
 Flow coverage:
 
-- Loaded first case from production preview
-- Verified mobile app shell and first case visibility
+- Loaded the production preview into the Murdoku-like case catalog
+- Verified mobile app shell, sealed case cards, filters and archive layout
+- Revealed the first case card, then opened the playable case
 - Tapped a grid cell and triggered a wrong grid check
 - Used one hint
 - Made a wrong accusation
@@ -50,8 +51,10 @@ Screenshots:
 
 ## Visual QA
 
+- Mobile first viewport now follows the Murdoku reference structure more closely: compact logo/controls, notice block, counts, filter chips, sort controls and two-column revealable case cards.
+- Play view is board-first: compact case title, run stats, brief, grid, suspect tray, clues, hints and accusation controls.
 - Mobile grid, palette, clues, hint panel and accusation controls fit without text overlap.
-- Desktop layout uses a two-column game/notebook composition with no nested-card clutter.
+- Desktop catalog remains centered with two-column case cards, matching the mobile-first product rather than becoming a generic dashboard.
 - Touch targets are at least 44px for primary controls and grid cells.
 - Contrast checked visually on warm paper backgrounds; status states use distinct color and icon changes.
 - Sticky header was removed after screenshot QA showed a full-page capture artifact; the topbar is now static to avoid scroll overlap.

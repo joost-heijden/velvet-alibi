@@ -1,15 +1,15 @@
 import type { CSSProperties } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  BookOpen,
+  ArrowLeft,
   CheckCircle2,
   ClipboardCheck,
   Clock3,
   Eraser,
+  Eye,
   Grid3X3,
   Lightbulb,
-  LockKeyhole,
-  RotateCcw,
+  Moon,
   Search,
   Share2,
   Sparkles,
@@ -30,19 +30,21 @@ import { formatShareResult } from './game/share'
 import type { CaseFile, CellCoord, CompletionRecord, PlayerGrid, Suspect } from './types'
 
 const STORAGE_KEY = 'velvet-alibi-completions'
+const REVEAL_KEY = 'velvet-alibi-revealed'
 
 type StyleWithVars = CSSProperties & Record<string, string | number>
+type ViewMode = 'catalog' | 'case'
 
-const readCompletions = (): Record<string, CompletionRecord> => {
+const readJson = <T,>(key: string, fallback: T): T => {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Record<string, CompletionRecord>
+    return JSON.parse(localStorage.getItem(key) ?? '') as T
   } catch {
-    return {}
+    return fallback
   }
 }
 
-const writeCompletions = (records: Record<string, CompletionRecord>) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(records))
+const writeJson = (key: string, value: unknown) => {
+  localStorage.setItem(key, JSON.stringify(value))
 }
 
 const initials = (name: string): string =>
@@ -57,7 +59,29 @@ const suspectById = (caseFile: CaseFile, suspectId: string | null): Suspect | un
 
 const sameCell = (a: CellCoord, row: number, col: number) => a.row === row && a.col === col
 
+function MiniBoard({ caseFile }: { caseFile: CaseFile }) {
+  return (
+    <div className="mini-board" aria-hidden="true">
+      {caseFile.solution.map((row, rowIndex) =>
+        row.map((suspectId, colIndex) => {
+          const suspect = suspectById(caseFile, suspectId)
+          const isMurder =
+            caseFile.murderCell.row === rowIndex && caseFile.murderCell.col === colIndex
+          return (
+            <span
+              className={isMurder ? 'murder' : ''}
+              key={`${rowIndex}-${colIndex}`}
+              style={{ '--suspect': suspect?.color ?? '#657858' } as StyleWithVars}
+            />
+          )
+        }),
+      )}
+    </div>
+  )
+}
+
 function App() {
+  const [view, setView] = useState<ViewMode>('catalog')
   const [activeCaseId, setActiveCaseId] = useState(cases[0].id)
   const activeCase = useMemo(() => getCaseById(activeCaseId), [activeCaseId])
   const [grid, setGrid] = useState<PlayerGrid>(() => createInitialGrid(cases[0]))
@@ -66,20 +90,26 @@ function App() {
   const [hintCount, setHintCount] = useState(0)
   const [mistakes, setMistakes] = useState(0)
   const [wrongCells, setWrongCells] = useState<CellCoord[]>([])
-  const [status, setStatus] = useState('Kies een verdachte en tik een leeg vak.')
+  const [status, setStatus] = useState('Select a suspect, then tap an empty square.')
   const [completion, setCompletion] = useState<CompletionRecord | null>(null)
   const [shareText, setShareText] = useState('')
-  const [records, setRecords] = useState<Record<string, CompletionRecord>>(() => readCompletions())
+  const [records, setRecords] = useState<Record<string, CompletionRecord>>(() =>
+    readJson(STORAGE_KEY, {}),
+  )
+  const [revealed, setRevealed] = useState<string[]>(() => readJson(REVEAL_KEY, []))
+  const [difficultyFilter, setDifficultyFilter] = useState('All')
 
   const progress = filledCount(grid)
   const total = totalCells(activeCase)
-  const progressPercent = Math.round((progress / total) * 100)
   const selectedSuspect = suspectById(activeCase, selectedSuspectId)
   const hints = [...activeCase.clues.map((clue) => clue.hint), ...activeCase.deduction]
-  const best = records[activeCase.id]
+  const completedCount = Object.keys(records).length
+  const filteredCases = cases.filter(
+    (caseFile) => difficultyFilter === 'All' || caseFile.difficulty === difficultyFilter,
+  )
 
   useEffect(() => {
-    if (completion) {
+    if (view !== 'case' || completion) {
       return undefined
     }
 
@@ -88,9 +118,9 @@ function App() {
     }, 1000)
 
     return () => window.clearInterval(timer)
-  }, [completion, activeCaseId])
+  }, [completion, view, activeCaseId])
 
-  const startCase = (caseFile: CaseFile) => {
+  const resetCaseState = (caseFile: CaseFile) => {
     setActiveCaseId(caseFile.id)
     setGrid(createInitialGrid(caseFile))
     setSelectedSuspectId(caseFile.suspects[0].id)
@@ -98,10 +128,35 @@ function App() {
     setHintCount(0)
     setMistakes(0)
     setWrongCells([])
-    setStatus('Nieuw dossier geopend. Begin met de gegeven vakken en de eerste clues.')
+    setStatus('Select a suspect, then tap an empty square.')
     setCompletion(null)
     setShareText('')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const openCase = (caseFile: CaseFile) => {
+    resetCaseState(caseFile)
+    setView('case')
+    if (navigator.userAgent.includes('jsdom')) {
+      return
+    }
+
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch {
+      return
+    }
+  }
+
+  const revealOrOpen = (caseFile: CaseFile) => {
+    if (!revealed.includes(caseFile.id) && !records[caseFile.id]) {
+      const next = [...revealed, caseFile.id]
+      setRevealed(next)
+      writeJson(REVEAL_KEY, next)
+      setStatus(`${caseFile.title} revealed.`)
+      return
+    }
+
+    openCase(caseFile)
   }
 
   const handleCellPress = (row: number, col: number) => {
@@ -112,7 +167,7 @@ function App() {
     const nextValue = grid[row][col] === selectedSuspectId ? null : selectedSuspectId
     setGrid((currentGrid) => setGridCell(activeCase, currentGrid, row, col, nextValue))
     setWrongCells((current) => current.filter((cell) => !sameCell(cell, row, col)))
-    setStatus(nextValue ? `${selectedSuspect?.name ?? 'Verdachte'} genoteerd.` : 'Vak leeggemaakt.')
+    setStatus(nextValue ? `${selectedSuspect?.name ?? 'Suspect'} placed.` : 'Square cleared.')
   }
 
   const handleCheck = () => {
@@ -121,16 +176,16 @@ function App() {
 
     if (nextWrongCells.length > 0) {
       setMistakes((value) => value + 1)
-      setStatus(`${nextWrongCells.length} vak(ken) botsen met het dossier. Corrigeer voor je beschuldigt.`)
+      setStatus(`${nextWrongCells.length} square(s) contradict the case file.`)
       return
     }
 
     if (progress < total) {
-      setStatus('Geen fouten in de ingevulde vakken. Gebruik rij/kolom-uniciteit om de rest te sluiten.')
+      setStatus('No mistakes in filled squares. Keep using row and column uniqueness.')
       return
     }
 
-    setStatus('Het raster is sluitend. Maak nu je finale beschuldiging.')
+    setStatus('The grid is closed. Make the final accusation.')
   }
 
   const completeCase = () => {
@@ -152,7 +207,7 @@ function App() {
         record.elapsedSeconds < existing.elapsedSeconds ||
         (record.elapsedSeconds === existing.elapsedSeconds && record.mistakes < existing.mistakes)
       const next = shouldReplace ? { ...current, [activeCase.id]: record } : current
-      writeCompletions(next)
+      writeJson(STORAGE_KEY, next)
       return next
     })
   }
@@ -162,12 +217,12 @@ function App() {
 
     if (suspectId !== activeCase.killerId) {
       setMistakes((value) => value + 1)
-      setStatus(`${suspect?.name ?? 'Deze verdachte'} klopt niet. Het gemarkeerde vak wijst ergens anders heen.`)
+      setStatus(`${suspect?.name ?? 'That suspect'} is not supported by the marked square.`)
       return
     }
 
     if (!gridIsSolved(activeCase, grid)) {
-      setStatus('Je vermoeden raakt de juiste naam, maar het dossier is nog niet sluitend. Maak eerst het raster af.')
+      setStatus('Right name, but the case file is not closed yet. Finish the grid first.')
       return
     }
 
@@ -176,13 +231,7 @@ function App() {
 
   const revealHint = () => {
     setHintCount((value) => Math.min(value + 1, hints.length))
-    setStatus('Vera Lens legt een zachte hint op je notitieblad.')
-  }
-
-  const clearActiveCell = () => {
-    setSelectedSuspectId(activeCase.suspects[0].id)
-    setWrongCells([])
-    setStatus('Palette gereset. Tik een verdachte om verder te puzzelen.')
+    setStatus('A hint was added to the case notes.')
   }
 
   const qaFillSolution = () => {
@@ -191,7 +240,7 @@ function App() {
     }
     setGrid(activeCase.solution.map((row) => [...row]))
     setWrongCells([])
-    setStatus('QA-oplossing ingevuld.')
+    setStatus('QA solution filled.')
   }
 
   const handleShare = async () => {
@@ -209,24 +258,130 @@ function App() {
       }
 
       await navigator.clipboard.writeText(text)
-      setStatus('Share-copy staat op je klembord.')
+      setStatus('Share copy is ready below.')
     } catch {
-      setStatus('Share-copy staat hieronder klaar.')
+      setStatus('Share copy is ready below.')
     }
   }
 
   return (
-    <main className="app-shell">
-      <section className="play-surface" aria-label="Velvet Alibi speelbord">
-        <header className="topbar">
-          <div className="brand-block">
-            <img src="/assets/app-icon.png" alt="" className="brand-icon" />
-            <div>
-              <p className="eyebrow">Sudoku meets cozy crime</p>
-              <h1>Velvet Alibi</h1>
-            </div>
+    <main className={`app-shell ${view === 'catalog' ? 'catalog-mode' : 'case-mode'}`}>
+      <header className="app-header">
+        <div className="brand-mark" aria-label="Velvet Alibi">
+          <img src="/assets/app-icon.png" alt="" />
+          <div>
+            <strong>VELVET ALIBI</strong>
+            <span>by Vera Lens</span>
           </div>
-          <div className="session-stats" aria-label="Sessie statistieken">
+        </div>
+        <div className="header-actions">
+          <button type="button">Sign in</button>
+          <select aria-label="Language" defaultValue="en">
+            <option value="en">English</option>
+            <option value="nl">Nederlands</option>
+          </select>
+          <button aria-label="Theme" type="button">
+            <Moon size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </header>
+
+      {view === 'catalog' ? (
+        <section className="catalog" aria-label="Case archive">
+          <div className="alpha-note">
+            Original cozy-crime sudoku cases. Reveal a file, then solve the suspect grid.
+          </div>
+
+          <div className="archive-counts">
+            <strong>{cases.length}</strong> cases
+            <span>
+              <strong>{completedCount}</strong> completed
+            </span>
+          </div>
+
+          <div className="filter-row" aria-label="Difficulty filters">
+            {['All', 'Warm-up', 'Slim', 'Stevig', 'Meesterlijk'].map((difficulty) => (
+              <button
+                className={difficultyFilter === difficulty ? 'on' : ''}
+                key={difficulty}
+                onClick={() => setDifficultyFilter(difficulty)}
+                type="button"
+              >
+                {difficulty}
+              </button>
+            ))}
+          </div>
+
+          <div className="sort-row">
+            <label>
+              Sort by:
+              <select defaultValue="difficulty">
+                <option value="difficulty">Difficulty</option>
+                <option value="title">Title</option>
+                <option value="status">Status</option>
+              </select>
+            </label>
+            <button type="button">Hide unreleased</button>
+          </div>
+
+          <div className="case-grid">
+            {filteredCases.map((caseFile) => {
+              const isRevealed = revealed.includes(caseFile.id) || Boolean(records[caseFile.id])
+              const record = records[caseFile.id]
+              return (
+                <button
+                  className={`archive-card ${isRevealed ? 'revealed' : 'sealed'}`}
+                  data-testid={`case-card-${caseFile.id}`}
+                  key={caseFile.id}
+                  onClick={() => revealOrOpen(caseFile)}
+                  type="button"
+                >
+                  {isRevealed ? (
+                    <>
+                      <MiniBoard caseFile={caseFile} />
+                      <strong>{caseFile.title}</strong>
+                      <span className="card-meta">
+                        <b>{caseFile.difficulty}</b>
+                        <span>{caseFile.suspects.length}x{caseFile.suspects.length}</span>
+                        <span>{caseFile.suspects.length} suspects</span>
+                      </span>
+                      {record ? <em>{formatTime(record.elapsedSeconds)}</em> : null}
+                    </>
+                  ) : (
+                    <>
+                      <img src="/assets/case-closed.webp" alt="" />
+                      <span>CASE</span>
+                      <strong>AVAILABLE!</strong>
+                      <small>CLICK TO REVEAL</small>
+                    </>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ) : (
+        <section className="play" aria-label="Murder sudoku case">
+          <button className="back-button" onClick={() => setView('catalog')} type="button">
+            <ArrowLeft size={18} aria-hidden="true" />
+            Cases
+          </button>
+
+          <section className="case-title-card">
+            <MiniBoard caseFile={activeCase} />
+            <div>
+              <p className="case-label">Case {String(activeCase.number).padStart(2, '0')}</p>
+              <h1>{activeCase.title}</h1>
+              <p>{activeCase.subtitle}</p>
+              <div className="case-facts">
+                <span>{activeCase.difficulty}</span>
+                <span>{activeCase.suspects.length}x{activeCase.suspects.length}</span>
+                <span>{activeCase.suspects.length} suspects</span>
+              </div>
+            </div>
+          </section>
+
+          <div className="run-stats" aria-label="Current run">
             <span>
               <Clock3 size={16} aria-hidden="true" />
               {formatTime(elapsedSeconds)}
@@ -240,65 +395,27 @@ function App() {
               {hintCount}
             </span>
           </div>
-        </header>
 
-        <nav className="case-rail" aria-label="Dossiers">
-          {cases.map((caseFile) => {
-            const record = records[caseFile.id]
-            return (
-              <button
-                className={`case-chip ${caseFile.id === activeCase.id ? 'active' : ''}`}
-                key={caseFile.id}
-                onClick={() => startCase(caseFile)}
-                type="button"
-              >
-                <span>Dossier {String(caseFile.number).padStart(2, '0')}</span>
-                <strong>{caseFile.title}</strong>
-                {record ? <small>{formatTime(record.elapsedSeconds)}</small> : <small>{caseFile.difficulty}</small>}
-              </button>
-            )
-          })}
-        </nav>
+          <section className="brief-card">
+            <h2>Case brief</h2>
+            <p>
+              <strong>Victim:</strong> {activeCase.victim}
+            </p>
+            <p>{activeCase.intro}</p>
+            <p className="murder-cell-note">
+              Final square: <strong>{activeCase.murderCell.label}</strong>
+            </p>
+          </section>
 
-        <div className="workspace">
-          <section className="case-panel" aria-labelledby="case-title">
-            <div className="case-heading">
-              <div>
-                <p className="eyebrow">Dossier {String(activeCase.number).padStart(2, '0')}</p>
-                <h2 id="case-title">{activeCase.title}</h2>
-                <p>{activeCase.subtitle}</p>
-              </div>
-              <span className="difficulty">{activeCase.difficulty}</span>
-            </div>
-
-            <div className="intro-strip">
-              <img src="/assets/mascot-assistant.webp" alt="Vera Lens, de hint-assistent" />
-              <div>
-                <p className="victim">Slachtoffer: {activeCase.victim}</p>
-                <p>{activeCase.intro}</p>
-                <p className="rule-note">
-                  <LockKeyhole size={16} aria-hidden="true" />
-                  {activeCase.sceneNote}
-                </p>
-              </div>
-            </div>
-
-            <div
-              className="progress-track"
-              aria-label={`Voortgang ${progressPercent} procent`}
-              style={{ '--progress': `${progressPercent}%` } as StyleWithVars}
-            >
-              <span />
-            </div>
-
+          <section className="board-card">
             <div
               className="logic-grid"
               style={{ '--n': activeCase.suspects.length } as StyleWithVars}
               role="grid"
-              aria-label="Alibi rooster"
+              aria-label="Suspect grid"
               data-testid="logic-grid"
             >
-              <div className="corner-label">Spoor</div>
+              <div className="corner-label">Place</div>
               {activeCase.columns.map((column) => (
                 <div className="column-label" key={column}>
                   {column}
@@ -312,7 +429,8 @@ function App() {
                     const suspect = suspectById(activeCase, value)
                     const locked = isGivenCell(activeCase, row, col)
                     const wrong = wrongCells.some((cell) => sameCell(cell, row, col))
-                    const murder = activeCase.murderCell.row === row && activeCase.murderCell.col === col
+                    const murder =
+                      activeCase.murderCell.row === row && activeCase.murderCell.col === col
 
                     return (
                       <button
@@ -339,150 +457,128 @@ function App() {
                 </div>
               ))}
             </div>
+          </section>
 
-            <div className="palette" aria-label="Verdachten">
+          <section className="suspect-tray" aria-label="Suspects">
+            {activeCase.suspects.map((suspect) => (
+              <button
+                className={selectedSuspectId === suspect.id ? 'active' : ''}
+                key={suspect.id}
+                onClick={() => setSelectedSuspectId(suspect.id)}
+                style={{ '--suspect': suspect.color } as StyleWithVars}
+                type="button"
+              >
+                <span className="token">{initials(suspect.name)}</span>
+                <span>
+                  <strong>{suspect.name}</strong>
+                  <small>{suspect.role}</small>
+                </span>
+              </button>
+            ))}
+          </section>
+
+          <div className="case-actions">
+            <button className="primary-action" onClick={handleCheck} type="button">
+              <ClipboardCheck size={18} aria-hidden="true" />
+              Check
+            </button>
+            <button className="secondary-action" onClick={() => resetCaseState(activeCase)} type="button">
+              <Eraser size={18} aria-hidden="true" />
+              Reset
+            </button>
+            {window.location.search.includes('qa=1') ? (
+              <button className="secondary-action" data-testid="qa-fill" onClick={qaFillSolution} type="button">
+                Fill solution
+              </button>
+            ) : null}
+          </div>
+
+          <div className={`status-line ${completion ? 'solved' : wrongCells.length ? 'error' : ''}`} role="status">
+            {completion ? <CheckCircle2 size={18} aria-hidden="true" /> : wrongCells.length ? <XCircle size={18} aria-hidden="true" /> : <Search size={18} aria-hidden="true" />}
+            <span>{status}</span>
+          </div>
+
+          <section className="clue-card">
+            <h2>Clues</h2>
+            {activeCase.clues.map((clue, index) => (
+              <details key={clue.id} open={index < 2}>
+                <summary>
+                  <span>{String(index + 1).padStart(2, '0')}</span>
+                  {clue.title}
+                </summary>
+                <p>{clue.body}</p>
+              </details>
+            ))}
+          </section>
+
+          <section className="hint-card">
+            <div>
+              <h2>Hints</h2>
+              <button disabled={hintCount >= hints.length} onClick={revealHint} type="button">
+                <Eye size={16} aria-hidden="true" />
+                Reveal hint
+              </button>
+            </div>
+            {hintCount === 0 ? (
+              <p>No hints used.</p>
+            ) : (
+              <ol>
+                {hints.slice(0, hintCount).map((hint) => (
+                  <li key={hint}>{hint}</li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          <section className="accuse-card">
+            <h2>Accuse</h2>
+            <p>
+              Read the suspect in <strong>{activeCase.murderCell.label}</strong>.
+            </p>
+            <div className="accuse-list">
               {activeCase.suspects.map((suspect) => (
                 <button
-                  className={`suspect-button ${selectedSuspectId === suspect.id ? 'active' : ''}`}
+                  data-testid={`accuse-${suspect.id}`}
                   key={suspect.id}
-                  onClick={() => setSelectedSuspectId(suspect.id)}
+                  onClick={() => handleAccuse(suspect.id)}
                   style={{ '--suspect': suspect.color } as StyleWithVars}
                   type="button"
                 >
                   <span className="token">{initials(suspect.name)}</span>
-                  <span>
-                    <strong>{suspect.name}</strong>
-                    <small>{suspect.role}</small>
-                  </span>
+                  {suspect.name}
                 </button>
               ))}
-              <button className="icon-button" onClick={clearActiveCell} title="Palette resetten" type="button">
-                <Eraser size={18} aria-hidden="true" />
-                <span>Reset</span>
-              </button>
-            </div>
-
-            <div className="action-row">
-              <button className="primary-action" onClick={handleCheck} type="button">
-                <ClipboardCheck size={18} aria-hidden="true" />
-                Check dossier
-              </button>
-              <button className="secondary-action" onClick={() => startCase(activeCase)} type="button">
-                <RotateCcw size={18} aria-hidden="true" />
-                Herstart
-              </button>
-              {window.location.search.includes('qa=1') ? (
-                <button className="secondary-action" data-testid="qa-fill" onClick={qaFillSolution} type="button">
-                  Vul oplossing
-                </button>
-              ) : null}
-            </div>
-
-            <div className={`status-line ${completion ? 'solved' : wrongCells.length ? 'error' : ''}`} role="status">
-              {completion ? <CheckCircle2 size={18} aria-hidden="true" /> : wrongCells.length ? <XCircle size={18} aria-hidden="true" /> : <Search size={18} aria-hidden="true" />}
-              <span>{status}</span>
             </div>
           </section>
 
-          <aside className="notebook" aria-label="Aanwijzingen en finale">
-            <section>
-              <div className="section-title">
-                <BookOpen size={18} aria-hidden="true" />
-                <h3>Aanwijzingen</h3>
-              </div>
-              <div className="clue-list">
-                {activeCase.clues.map((clue, index) => (
-                  <article className="clue" key={clue.id}>
-                    <span>{String(index + 1).padStart(2, '0')}</span>
-                    <div>
-                      <h4>{clue.title}</h4>
-                      <p>{clue.body}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="hint-box">
-              <div className="section-title">
-                <Lightbulb size={18} aria-hidden="true" />
-                <h3>Hints van Vera</h3>
-              </div>
-              <img src="/assets/hint-notebook.webp" alt="" />
-              {hintCount === 0 ? (
-                <p>Hints sturen je naar de volgende logische stap zonder de finale naam direct weg te geven.</p>
-              ) : (
-                <ol>
-                  {hints.slice(0, hintCount).map((hint) => (
-                    <li key={hint}>{hint}</li>
-                  ))}
-                </ol>
-              )}
-              <button className="secondary-action full" disabled={hintCount >= hints.length} onClick={revealHint} type="button">
-                <Lightbulb size={18} aria-hidden="true" />
-                Toon hint
-              </button>
-            </section>
-
-            <section className="accuse-box">
-              <div className="section-title">
-                <Search size={18} aria-hidden="true" />
-                <h3>Finale beschuldiging</h3>
-              </div>
-              <p>
-                Gemarkeerde cel: <strong>{activeCase.murderCell.label}</strong>
-              </p>
-              <div className="accuse-list">
-                {activeCase.suspects.map((suspect) => (
-                  <button
-                    data-testid={`accuse-${suspect.id}`}
-                    key={suspect.id}
-                    onClick={() => handleAccuse(suspect.id)}
-                    style={{ '--suspect': suspect.color } as StyleWithVars}
-                    type="button"
-                  >
-                    <span className="token">{initials(suspect.name)}</span>
-                    {suspect.name}
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {completion ? (
-              <section className="share-box" data-testid="share-box">
-                <img src="/assets/share-card.webp" alt="" />
-                <div>
-                  <p className="eyebrow">Dossier gesloten</p>
-                  <h3>{formatTime(completion.elapsedSeconds)}</h3>
-                  <p>
-                    {completion.hintsUsed} hint(s), {completion.mistakes} correctie(s),{' '}
-                    {completion.clean ? 'foutloos afgerond' : 'dossier hersteld'}.
-                  </p>
-                </div>
-                <button className="primary-action full" onClick={handleShare} type="button">
-                  <Share2 size={18} aria-hidden="true" />
-                  Deel resultaat
-                </button>
-                {shareText ? <textarea data-testid="share-text" readOnly value={shareText} /> : null}
-              </section>
-            ) : (
-              <section className="mascot-note">
-                <img src="/assets/case-closed.webp" alt="" />
+          {completion ? (
+            <section className="share-box" data-testid="share-box">
+              <img src="/assets/share-card.webp" alt="" />
+              <div>
+                <p className="case-label">Case closed</p>
+                <h2>{formatTime(completion.elapsedSeconds)}</h2>
                 <p>
-                  Tip: speel als een sudoku. De crime-sfeer zit in de clues; de zekerheid komt uit rijen en kolommen.
+                  {completion.hintsUsed} hint(s), {completion.mistakes} correction(s),{' '}
+                  {completion.clean ? 'clean solve' : 'case repaired'}.
                 </p>
-              </section>
-            )}
+              </div>
+              <button className="primary-action full" onClick={handleShare} type="button">
+                <Share2 size={18} aria-hidden="true" />
+                Share result
+              </button>
+              {shareText ? <textarea data-testid="share-text" readOnly value={shareText} /> : null}
+            </section>
+          ) : null}
 
-            {best ? (
-              <section className="best-run">
-                <Sparkles size={18} aria-hidden="true" />
-                Beste run: {formatTime(best.elapsedSeconds)} met {best.hintsUsed} hint(s).
-              </section>
-            ) : null}
-          </aside>
-        </div>
-      </section>
+          {records[activeCase.id] ? (
+            <section className="best-run">
+              <Sparkles size={18} aria-hidden="true" />
+              Best run: {formatTime(records[activeCase.id].elapsedSeconds)} with{' '}
+              {records[activeCase.id].hintsUsed} hint(s).
+            </section>
+          ) : null}
+        </section>
+      )}
     </main>
   )
 }

@@ -17,6 +17,8 @@ Date: 2026-06-24
 ## What Works
 
 - Daily ritual matters. Murdle and Clues by Sam both lean on a daily puzzle loop, archives or progression, and a quick return habit.
+- Murdoku's `/play` page is primarily a compact case archive: logo, sign-in/language/theme controls, a small status notice, puzzle/completion counts, filter chips, sort controls and a two-column grid of case envelopes.
+- The Murdoku case card interaction is important: unrevealed files appear as sealed case envelopes with "click to reveal"; revealed cards show a small puzzle thumbnail, title, difficulty, grid size and suspect count.
 - Clear deductive contract matters. Clues by Sam explicitly prevents guessing and uses progressive clue reveal; this creates trust and a strong "I earned it" finish.
 - Murdoku's row/column rule is instantly understandable: place suspects so each row and column is unique, then read the final square.
 - Mystery categories are familiar: suspects, rooms/locations, evidence, weapons/objects and motives are easy for players to parse.
@@ -41,7 +43,7 @@ Positioning: **Sudoku meets cozy crime.**
 
 Experience principles:
 
-- First viewport is the playable case shell.
+- First viewport is a playable case archive with revealable cards, not an editorial dashboard or landing page.
 - Warm paper, brass, oxblood, ink blue and sage instead of generic dark noir or all-pink.
 - Small daily-brain-game cadence, but with bookclub/podcast texture.
 - Original murder-sudoku variant: suspects are placed into a Latin alibi grid; the highlighted final cell identifies the culprit.

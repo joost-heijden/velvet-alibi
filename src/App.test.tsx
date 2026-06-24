@@ -13,24 +13,28 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /Velvet Alibi/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: /Het stilte-uur in de leeszaal/i })).toBeInTheDocument()
+    expect(screen.getByText(/VELVET ALIBI/i)).toBeInTheDocument()
+    expect(screen.getByText(/Original cozy-crime sudoku cases/i)).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('case-card-reading-room'))
+    await user.click(screen.getByTestId('case-card-reading-room'))
+    expect(screen.getByRole('heading', { level: 1, name: /Het stilte-uur in de leeszaal/i })).toBeInTheDocument()
 
     await user.click(screen.getByTestId('cell-0-1'))
-    await user.click(screen.getByRole('button', { name: /Check dossier/i }))
-    expect(screen.getByText(/botsen met het dossier/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Check/i }))
+    expect(screen.getByText(/contradict the case file/i)).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Toon hint/i }))
+    await user.click(screen.getByRole('button', { name: /Reveal hint/i }))
     expect(screen.getByText(/Begin linksboven/i)).toBeInTheDocument()
 
     await user.click(screen.getByTestId('qa-fill'))
     await user.click(screen.getByTestId('accuse-ada'))
-    expect(screen.getByText(/klopt niet/i)).toBeInTheDocument()
+    expect(screen.getByText(/not supported by the marked square/i)).toBeInTheDocument()
 
     await user.click(screen.getByTestId('accuse-mara'))
     expect(screen.getByTestId('share-box')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Deel resultaat/i }))
+    await user.click(screen.getByRole('button', { name: /Share result/i }))
     expect((screen.getByTestId('share-text') as HTMLTextAreaElement).value).toContain('Ik loste Dossier 01')
   })
 })
